@@ -46,6 +46,16 @@ basic_tests = [
 ]
 
 
+def _remove_except_zip(dictionary):
+    """
+    In order to not lie in coverage redux the test run on the
+    tests to just ZipCheck which has full coverage
+    """
+    redux = dict()
+    redux['ZipCheck'] = dictionary['ZipCheck']
+    return redux
+
+
 def test_cases_loading():
     linter = Lint(options_preset)
     assert list(linter.checks.keys()) == basic_tests
@@ -112,9 +122,9 @@ def test_run_single(capsys, packages):
     }
     options = {**options_preset, **additional_options}
     linter = Lint(options)
+    linter.checks = _remove_except_zip(linter.checks)
     linter.run()
     out, err = capsys.readouterr()
-    assert 'E: no-signature' in out
     assert '1 packages and 0 specfiles checked' in out
     assert not err
 
@@ -128,6 +138,7 @@ def test_run_installed(capsys, packages):
     }
     options = {**options_preset, **additional_options}
     linter = Lint(options)
+    linter.checks = _remove_except_zip(linter.checks)
     linter.run()
     out, err = capsys.readouterr()
     assert '3 packages and 0 specfiles checked' in out
@@ -145,6 +156,7 @@ def test_run_strict(capsys, packages):
     }
     options = {**options_preset, **additional_options}
     linter = Lint(options)
+    linter.checks = _remove_except_zip(linter.checks)
     linter.run()
     out, err = capsys.readouterr()
     assert 'W: unable-to-read-zip' not in out
@@ -159,6 +171,7 @@ def test_run_installed_not_present(capsys):
     }
     options = {**options_preset, **additional_options}
     linter = Lint(options)
+    linter.checks = _remove_except_zip(linter.checks)
     linter.run()
     out, err = capsys.readouterr()
     assert '0 packages and 0 specfiles checked' in out
@@ -173,6 +186,7 @@ def test_run_installed_and_no_files(capsys):
     }
     options = {**options_preset, **additional_options}
     linter = Lint(options)
+    linter.checks = _remove_except_zip(linter.checks)
     linter.run()
     out, err = capsys.readouterr()
     assert '1 packages and 0 specfiles checked' in out
@@ -186,12 +200,14 @@ def test_header_information(capsys):
     }
     options = {**options_preset, **additional_options}
     linter = Lint(options)
+    linter.checks = _remove_except_zip(linter.checks)
     linter.run()
     out, err = capsys.readouterr()
     assert 'packages: 1' in out
 
 
 @pytest.mark.parametrize('packages', [list(Path('test').glob('*/*.rpm'))])
+@pytest.mark.no_cover
 def test_run_full_rpm(capsys, packages):
     number_of_pkgs = len(packages)
     additional_options = {
@@ -212,6 +228,7 @@ def test_run_full_rpm(capsys, packages):
 
 
 @pytest.mark.parametrize('packages', [list(Path('test/spec').glob('*.spec'))])
+@pytest.mark.no_cover
 def test_run_full_specs(capsys, packages):
     number_of_pkgs = len(packages)
     additional_options = {
@@ -226,6 +243,7 @@ def test_run_full_specs(capsys, packages):
 
 
 @pytest.mark.parametrize('packages', [Path('test/spec')])
+@pytest.mark.no_cover
 def test_run_full_directory(capsys, packages):
     assert packages.is_dir()
     file_list = []
