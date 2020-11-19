@@ -1,0 +1,30 @@
+[FileSignature]
+Locations = [
+    # cron locations
+    "/etc/cron.d/",
+    "/etc/cron.hourly/",
+    "/etc/cron.daily/",
+    "/etc/cron.weekly/",
+    "/etc/cron.monthly/",
+    # D-Bus locations
+    "/usr/share/dbus-1/system-services/",
+    "/usr/share/dbus-1/system.d/",
+    "/etc/dbus-1/system.d/",
+    # Polkit location
+    "/etc/polkit-default-privs.d/",
+    "/etc/polkit-1/rules.d/",
+    "/usr/share/polkit-1/rules.d/"
+]
+
+[FileSignatures]
+
+# Bug reference: boo#1150554
+# Builds statistics based on Squid logfile metadata.
+# Include sarg-reports which is SUSE specific and important for privilege dropping.
+[FileSignatures.sarg."/etc/cron.daily/suse.de-sarg"]
+algorithm = "sha256"
+hash = "d536dc68e198189149048a907ea6d56a7ee9fc732ae8fec5a4072ad06640e359"
+
+[FileSignatures.sarg."/etc/cron.monthly/suse.de-sarg"]
+algorithm = "sha256"
+hash = "d536dc68e198189149048a907ea6d56a7ee9fc732ae8fec5a4072ad06640e359"
