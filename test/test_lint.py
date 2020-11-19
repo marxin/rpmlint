@@ -32,6 +32,7 @@ basic_tests = [
     'ErlangCheck',
     'FHSCheck',
     'FilesCheck',
+    'FileDigestCheck',
     'IconSizesCheck',
     'I18NCheck',
     'LogrotateCheck',
