@@ -35,3 +35,14 @@ Include sarg-reports which is SUSE specific and important for privilege dropping
 [FileDigestGroup.atop."boo#12345".digests]
 "/etc/cron.daily/suse.de-sarg" = "d536dc68e198189149048a907ea6d56a7ee9fc732ae8fec5a4072ad06640e359"
 "/etc/cron.monthly/suse.de-sarg" = "d536dc68e198189149048a907ea6d56a7ee9fc732ae8fec5a4072ad06640e359"
+
+[FileMetadataCheck."boo#2345"]
+package = "foobar"
+note = "My note"
+
+[FileMetadataCheck."boo#2345".metadata."/etc/cron.daily/test-me"]
+mode = "crw-rw----"
+owner = "root"
+group = "tty"
+device_minor = 1
+device_major = 5
