@@ -33,6 +33,7 @@ basic_tests = [
     'FHSCheck',
     'FilesCheck',
     'FileDigestCheck',
+    'FileMetadataCheck',
     'IconSizesCheck',
     'I18NCheck',
     'LogrotateCheck',
