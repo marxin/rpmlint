@@ -12,18 +12,14 @@ class FileDigestCheck(AbstractCheck):
         for group, values in self.config.configuration['FileDigestLocation'].items():
             self.digest_groups[group] = [Path(p) for p in values['Locations']]
 
-        self.known_digests = {}
-        for value in self.config.configuration['FileDigestGroup'].values():
-            for path, digest in value['digests'].items():
-                if self._get_digest_group_from_path(path) is None:
-                    raise Exception(f'Invalid digest location {path}')
-                self.known_digests[path] = digest
-                # verify algorithm
-                alg = digest['algorithm']
-                if alg == 'skip':
-                    continue
-                else:
-                    hashlib.new(alg)
+        self.package_digests = {}
+        for package, issues in self.config.configuration['FileDigestGroup'].items():
+            self.package_digests[package] = {}
+            for value in issues.values():
+                for path, digest in value['digests'].items():
+                    if self._get_digest_group_from_path(path) is None:
+                        raise Exception(f'Invalid digest location {path}')
+                    self.package_digests[package].setdefault(path, []).append(digest)
 
     def _get_digest_group_from_path(self, path):
         path = Path(path)
@@ -40,8 +36,11 @@ class FileDigestCheck(AbstractCheck):
         """
         TODO: add comment
         """
+        known_digests = self.package_digests.get(pkg.name)
         for filename, pkgfile in pkg.files.items():
             group = self._get_digest_group_from_path(filename)
+            if not group:
+                continue
             if stat.S_ISDIR(pkgfile.mode):
                 continue
             elif stat.S_ISLNK(pkgfile.mode) and group:
@@ -50,23 +49,21 @@ class FileDigestCheck(AbstractCheck):
 
             if filename in pkg.ghost_files:
                 self.output.add_info('E', pkg, f'{group}-file-digest-ghost', filename)
-            elif filename in self.known_digests:
-                digest = self.known_digests[filename]
-                alg = digest['algorithm']
-
-                if alg == 'skip':
-                    continue
-
-                h = hashlib.new(alg)
-                with open(pkgfile.path, 'rb') as fd:
-                    while True:
-                        chunk = fd.read(4096)
-                        if not chunk:
-                            break
-                        h.update(chunk)
-                signature = h.hexdigest()
-                if signature != digest['hash']:
-                    self.output.add_info('E', pkg, f'{group}-file-digest-mismatch', filename,
-                                         f'expected:{digest["hash"]}', f'has:{signature}')
+            elif known_digests and filename in known_digests:
+                expected_digests = known_digests[filename]
+                if 'skip' in expected_digests:
+                    pass
+                else:
+                    h = hashlib.new('sha256')
+                    with open(pkgfile.path, 'rb') as fd:
+                        while True:
+                            chunk = fd.read(4096)
+                            if not chunk:
+                                break
+                            h.update(chunk)
+                    hexdigest = h.hexdigest()
+                    if hexdigest not in expected_digests:
+                        self.output.add_info('E', pkg, f'{group}-file-digest-mismatch', filename,
+                                             f'expected:{",".join(expected_digests)}', f'has:{hexdigest}')
             elif group:
                 self.output.add_info('E', pkg, f'{group}-file-digest-unauthorized', filename)
