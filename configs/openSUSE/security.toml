@@ -1,6 +1,7 @@
 # Configuration for security checks
 
 [FileDigestLocation.cron]
+FollowSymlinks = true
 Locations = [
     "/etc/cron.d/",
     "/etc/cron.hourly/",
@@ -10,6 +11,7 @@ Locations = [
 ]
 
 [FileDigestLocation.dbus]
+FollowSymlinks = true
 Locations = [
     "/usr/share/dbus-1/system-services/",
     "/usr/share/dbus-1/system.d/",
@@ -17,6 +19,7 @@ Locations = [
 ]
 
 [FileDigestLocation.polkit]
+FollowSymlinks = true
 Locations = [
     "/etc/polkit-default-privs.d/",
     "/etc/polkit-1/rules.d/",

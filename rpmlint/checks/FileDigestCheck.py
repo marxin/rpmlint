@@ -9,8 +9,10 @@ class FileDigestCheck(AbstractCheck):
     def __init__(self, config, output):
         super().__init__(config, output)
         self.digest_groups = {}
+        self.follow_symlinks_in_group = {}
         for group, values in self.config.configuration['FileDigestLocation'].items():
             self.digest_groups[group] = [Path(p) for p in values['Locations']]
+            self.follow_symlinks_in_group[group] = values['FollowSymlinks']
 
         self.package_digests = {}
         for package, issues in self.config.configuration['FileDigestGroup'].items():
@@ -43,9 +45,17 @@ class FileDigestCheck(AbstractCheck):
                 continue
             if stat.S_ISDIR(pkgfile.mode):
                 continue
-            elif stat.S_ISLNK(pkgfile.mode) and group:
+
+            if stat.S_ISLNK(pkgfile.mode) and not self.follow_symlinks_in_group[group]:
                 self.output.add_info('W', pkg, f'{group}-file-symlink', filename)
                 continue
+
+            pkgfile = pkg.readlink(pkgfile)
+            if not pkgfile:
+                self.output.add_info('W', pkg, f'{group}-file-symlink', filename, 'broken symlink')
+                continue
+
+            filename = pkgfile.name
 
             if filename in pkg.ghost_files:
                 self.output.add_info('E', pkg, f'{group}-file-digest-ghost', filename)
