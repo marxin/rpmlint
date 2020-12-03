@@ -13,7 +13,7 @@ def metadatacheck():
     return output, test
 
 
-@pytest.mark.parametrize('package', ['binary/file-signature'])
+@pytest.mark.parametrize('package', ['binary/file-signature-good'])
 def test_signatures(tmpdir, package, metadatacheck):
     output, test = metadatacheck
     test.check(get_tested_package(package, tmpdir))
