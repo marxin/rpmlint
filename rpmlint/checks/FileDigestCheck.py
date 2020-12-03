@@ -8,24 +8,28 @@ from rpmlint.checks.AbstractCheck import AbstractCheck
 class FileDigestCheck(AbstractCheck):
     def __init__(self, config, output):
         super().__init__(config, output)
-        self.digest_groups = {}
+        self.digest_configurations = {}
         self.follow_symlinks_in_group = {}
         for group, values in self.config.configuration['FileDigestLocation'].items():
-            self.digest_groups[group] = [Path(p) for p in values['Locations']]
+            self.digest_configurations[group] = [Path(p) for p in values['Locations']]
             self.follow_symlinks_in_group[group] = values['FollowSymlinks']
 
-        self.package_digests = {}
-        for package, issues in self.config.configuration['FileDigestGroup'].items():
-            self.package_digests[package] = {}
+        self.digest_groups = []
+        for issues in self.config.configuration['FileDigestGroup'].values():
             for value in issues.values():
-                for path, digest in value['digests'].items():
-                    if self._get_digest_group_from_path(path) is None:
-                        raise Exception(f'Invalid digest location {path}')
-                    self.package_digests[package].setdefault(path, []).append(digest)
+                self.digest_groups.append(value['digests'])
+                # verify digest algorithm
+                for digest in value['digests'].values():
+                    algorithm = digest['algorithm']
+                    if algorithm == 'skip':
+                        pass
+                    else:
+                        hashlib.new(algorithm)
+        self.digest_cache = {}
 
-    def _get_digest_group_from_path(self, path):
+    def _get_digest_location_from_path(self, path):
         path = Path(path)
-        for group, locations in self.digest_groups.items():
+        for group, locations in self.digest_configurations.items():
             for location in locations:
                 try:
                     if path.relative_to(location):
@@ -34,46 +38,90 @@ class FileDigestCheck(AbstractCheck):
                     pass
         return None
 
-    def check_binary(self, pkg):
+    def _in_digest_configuration_group(self, pkgfile):
+        if stat.S_ISDIR(pkgfile.mode):
+            return False
+        return self._get_digest_location_from_path(pkgfile.name)
+
+    def _check_symlinks(self, pkg):
         """
-        TODO: add comment
+        Check that all symlinks point to a correct location and that
+        symlinks are allowed in a configuration group.
         """
-        known_digests = self.package_digests.get(pkg.name)
+        result = True
         for filename, pkgfile in pkg.files.items():
-            group = self._get_digest_group_from_path(filename)
-            if not group:
+            group = self._get_digest_location_from_path(filename)
+            if not self._in_digest_configuration_group(pkgfile):
                 continue
-            if stat.S_ISDIR(pkgfile.mode):
+
+            if filename in pkg.ghost_files:
+                self.output.add_info('E', pkg, f'{group}-file-digest-ghost', filename)
+                result = False
                 continue
 
             if stat.S_ISLNK(pkgfile.mode) and not self.follow_symlinks_in_group[group]:
-                self.output.add_info('W', pkg, f'{group}-file-symlink', filename)
+                self.output.add_info('E', pkg, f'{group}-file-symlink', filename)
+                result = False
                 continue
 
             pkgfile = pkg.readlink(pkgfile)
             if not pkgfile:
-                self.output.add_info('W', pkg, f'{group}-file-symlink', filename, 'broken symlink')
+                self.output.add_info('E', pkg, f'{group}-file-symlink', filename, 'broken symlink')
+                result = False
+        return result
+
+    def _is_valid_digest(self, pkgfile, digest):
+        algorithm = digest['algorithm']
+        if algorithm == 'skip':
+            return True
+
+        digest_hash = digest['hash']
+        pair = (pkgfile.name, algorithm)
+        if pair not in self.digest_cache:
+            h = hashlib.new(algorithm)
+            with open(pkgfile.path, 'rb') as fd:
+                while True:
+                    chunk = fd.read(4096)
+                    if not chunk:
+                        break
+                    h.update(chunk)
+            self.digest_cache[pair] = h.hexdigest()
+
+        return self.digest_cache[pair] == digest_hash
+
+    def _check_group_digests(self, digest_group, pkg):
+        for filename, digest in digest_group.items():
+            if not self._is_valid_digest(pkg.files[filename], digest):
+                return False
+        return True
+
+    def check_binary(self, pkg):
+        """
+        Check that all files in secured locations are covered by a file digest group
+        in which all files have valid digest.
+        """
+
+        if not self._check_symlinks(pkg):
+            return
+
+        # First collect all files that are in a digest configuration group
+        secured_paths = {pkgfile.name for pkgfile in pkg.files.values() if self._in_digest_configuration_group(pkgfile)}
+
+        # Iterate all digest groups and find one that covers all secured files
+        # and in which all digests match
+        for digest_group in self.digest_groups:
+            covered_files = set(digest_group.keys())
+            if secured_paths - covered_files:
+                # bail out as some secured paths are not covered
                 continue
+            elif covered_files - set(pkg.files.keys()):
+                # a group has a digest for a file that is not in the package
+                continue
+            elif self._check_group_digests(digest_group, pkg):
+                # we are done, we found a valid group
+                return
 
-            filename = pkgfile.name
-
-            if filename in pkg.ghost_files:
-                self.output.add_info('E', pkg, f'{group}-file-digest-ghost', filename)
-            elif known_digests and filename in known_digests:
-                expected_digests = known_digests[filename]
-                if 'skip' in expected_digests:
-                    pass
-                else:
-                    h = hashlib.new('sha256')
-                    with open(pkgfile.path, 'rb') as fd:
-                        while True:
-                            chunk = fd.read(4096)
-                            if not chunk:
-                                break
-                            h.update(chunk)
-                    hexdigest = h.hexdigest()
-                    if hexdigest not in expected_digests:
-                        self.output.add_info('E', pkg, f'{group}-file-digest-mismatch', filename,
-                                             f'expected:{",".join(expected_digests)}', f'has:{hexdigest}')
-            elif group:
-                self.output.add_info('E', pkg, f'{group}-file-digest-unauthorized', filename)
+        # Report errors
+        for filename in sorted(secured_paths):
+            group = self._get_digest_location_from_path(filename)
+            self.output.add_info('E', pkg, f'{group}-file-digest-unauthorized', filename)
