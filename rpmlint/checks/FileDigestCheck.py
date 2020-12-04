@@ -65,17 +65,17 @@ class FileDigestCheck(AbstractCheck):
                 self.output.add_info('E', pkg, f'{group}-file-symlink', filename)
                 result = False
                 continue
-
-            pkgfile = pkg.readlink(pkgfile)
-            if not pkgfile:
-                self.output.add_info('E', pkg, f'{group}-file-symlink', filename, 'broken symlink')
-                result = False
         return result
 
-    def _is_valid_digest(self, pkgfile, digest):
+    def _is_valid_digest(self, pkgfile, digest, pkg):
         algorithm = digest['algorithm']
         if algorithm == 'skip':
             return True
+
+        while stat.S_ISLNK(pkgfile.mode):
+            pkgfile = pkg.readlink(pkgfile)
+            if not pkgfile:
+                return False
 
         digest_hash = digest['hash']
         pair = (pkgfile.name, algorithm)
@@ -93,7 +93,7 @@ class FileDigestCheck(AbstractCheck):
 
     def _check_group_digests(self, digest_group, pkg):
         for filename, digest in digest_group.items():
-            if not self._is_valid_digest(pkg.files[filename], digest):
+            if not self._is_valid_digest(pkg.files[filename], digest, pkg):
                 return False
         return True
 
