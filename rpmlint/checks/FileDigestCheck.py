@@ -14,17 +14,15 @@ class FileDigestCheck(AbstractCheck):
             self.digest_configurations[group] = [Path(p) for p in values['Locations']]
             self.follow_symlinks_in_group[group] = values['FollowSymlinks']
 
-        self.digest_groups = []
-        for issues in self.config.configuration['FileDigestGroup'].values():
-            for value in issues.values():
-                self.digest_groups.append(value['digests'])
-                # verify digest algorithm
-                for digest in value['digests'].values():
-                    algorithm = digest['algorithm']
-                    if algorithm == 'skip':
-                        pass
-                    else:
-                        hashlib.new(algorithm)
+        self.digest_groups = [fd['digests'] for fd in self.config.configuration['FileDigestGroup'] if 'digests' in fd]
+        for digest_group in self.digest_groups:
+            # verify digest algorithm
+            for digest in digest_group.values():
+                algorithm = digest['algorithm']
+                if algorithm == 'skip':
+                    pass
+                else:
+                    hashlib.new(algorithm)
         self.digest_cache = {}
 
     def _get_digest_location_from_path(self, path):
