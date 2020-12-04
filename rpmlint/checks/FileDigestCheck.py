@@ -24,8 +24,9 @@ class FileDigestCheck(AbstractCheck):
                 else:
                     hashlib.new(algorithm)
         self.digest_cache = {}
+        self.digest_configuration_group_cache = {}
 
-    def _get_digest_location_from_path(self, path):
+    def _get_digest_configuration_group_no_cache(self, path):
         path = Path(path)
         for group, locations in self.digest_configurations.items():
             for location in locations:
@@ -36,20 +37,23 @@ class FileDigestCheck(AbstractCheck):
                     pass
         return None
 
-    def _in_digest_configuration_group(self, pkgfile):
+    def _get_digest_configuration_group(self, pkgfile):
         if stat.S_ISDIR(pkgfile.mode):
-            return False
-        return self._get_digest_location_from_path(pkgfile.name)
+            return None
+        if pkgfile.name not in self.digest_configuration_group_cache:
+            gr = self._get_digest_configuration_group_no_cache(pkgfile.name)
+            self.digest_configuration_group_cache[pkgfile.name] = gr
+        return self.digest_configuration_group_cache[pkgfile.name]
 
-    def _check_symlinks(self, pkg):
+    def _check_filetypes(self, pkg):
         """
         Check that all symlinks point to a correct location and that
         symlinks are allowed in a configuration group.
         """
         result = True
         for filename, pkgfile in pkg.files.items():
-            group = self._get_digest_location_from_path(filename)
-            if not self._in_digest_configuration_group(pkgfile):
+            group = self._get_digest_configuration_group(pkgfile)
+            if not group:
                 continue
 
             if filename in pkg.ghost_files:
@@ -99,11 +103,11 @@ class FileDigestCheck(AbstractCheck):
         in which all files have valid digest.
         """
 
-        if not self._check_symlinks(pkg):
+        if not self._check_filetypes(pkg):
             return
 
         # First collect all files that are in a digest configuration group
-        secured_paths = {pkgfile.name for pkgfile in pkg.files.values() if self._in_digest_configuration_group(pkgfile)}
+        secured_paths = {pkgfile.name for pkgfile in pkg.files.values() if self._get_digest_configuration_group(pkgfile)}
 
         # Iterate all digest groups and find one that covers all secured files
         # and in which all digests match
@@ -121,5 +125,5 @@ class FileDigestCheck(AbstractCheck):
 
         # Report errors
         for filename in sorted(secured_paths):
-            group = self._get_digest_location_from_path(filename)
+            group = self._get_digest_configuration_group(pkg.files[filename])
             self.output.add_info('E', pkg, f'{group}-file-digest-unauthorized', filename)
