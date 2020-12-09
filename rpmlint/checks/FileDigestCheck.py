@@ -91,11 +91,29 @@ class FileDigestCheck(AbstractCheck):
 
         return self.digest_cache[pair] == digest_hash
 
-    def _check_group_digests(self, digest_group, pkg):
+    def _calculate_errors_for_digest_group(self, pkg, digest_group, secured_paths):
+        errors = []
+        covered_files = set(digest_group.keys())
+        pkg_files = set(pkg.files.keys())
+
+        # report errors for secured files not covered by the digest group
+        for filename in secured_paths - covered_files:
+            group = self._get_digest_configuration_group(pkg.files[filename])
+            errors.append((f'{group}-file-digest-unauthorized', filename))
+
+        # report errors for missing files mentioned in the digest group
+        for filename in covered_files - pkg_files:
+            group = self._get_digest_configuration_group(pkg.files[filename])
+            errors.append((f'{group}-file-digest-unauthorized', filename))
+
+        # report errors for invalid digests
         for filename, digest in digest_group.items():
-            if not self._is_valid_digest(pkg.files[filename], digest, pkg):
-                return False
-        return True
+            if filename in pkg_files:
+                group = self._get_digest_configuration_group(pkg.files[filename])
+                if not self._is_valid_digest(pkg.files[filename], digest, pkg):
+                    errors.append((f'{group}-file-digest-mismatch', filename))
+
+        return errors
 
     def check_binary(self, pkg):
         """
@@ -106,24 +124,22 @@ class FileDigestCheck(AbstractCheck):
         if not self._check_filetypes(pkg):
             return
 
+        if not self.digest_groups:
+            return
+
         # First collect all files that are in a digest configuration group
         secured_paths = {pkgfile.name for pkgfile in pkg.files.values() if self._get_digest_configuration_group(pkgfile)}
 
         # Iterate all digest groups and find one that covers all secured files
         # and in which all digests match
+        best_errors = None
         for digest_group in self.digest_groups:
-            covered_files = set(digest_group.keys())
-            if secured_paths - covered_files:
-                # bail out as some secured paths are not covered
-                continue
-            elif covered_files - set(pkg.files.keys()):
-                # a group has a digest for a file that is not in the package
-                continue
-            elif self._check_group_digests(digest_group, pkg):
-                # we are done, we found a valid group
+            errors = self._calculate_errors_for_digest_group(pkg, digest_group, secured_paths)
+            if not errors:
                 return
+            if not best_errors or len(errors) < len(best_errors):
+                best_errors = errors
 
         # Report errors
-        for filename in sorted(secured_paths):
-            group = self._get_digest_configuration_group(pkg.files[filename])
-            self.output.add_info('E', pkg, f'{group}-file-digest-unauthorized', filename)
+        for message, filename in sorted(best_errors):
+            self.output.add_info('E', pkg, message, filename)
