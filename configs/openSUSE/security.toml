@@ -26,30 +26,6 @@ Locations = [
     "/usr/share/polkit-1/rules.d/"
 ]
 
-[FileDigestGroup.file-signature."boo#12345"]
-note = """
-Builds statistics based on Squid logfile metadata.
-Include sarg-reports which is SUSE specific and important for privilege dropping.
-"""
-
-[FileDigestGroup.file-signature."boo#12345".digests."/etc/cron.daily/suse.de-sarg"]
-algorithm = "sha256"
-hash = "d536dc68e198189149048a907ea6d56a7ee9fc732ae8fec5a4072ad06640e359"
-
-[FileDigestGroup.file-signature."boo#12345".digests."/etc/cron.monthly/suse.de-sarg"]
-algorithm = "sha256"
-hash = "d536dc68e198189149048a907ea6d56a7ee9fc732ae8fec5a4072ad06640e359"
-
-[FileDigestGroup.file-signature."boo#12345".digests."/etc/cron.daily/test-me-good"]
-algorithm = "sha256"
-hash = "f6bb30ca27a30f957c5d19aebc3a3e56d95d8e930d7bf6c94fafbb378391d832"
-
-[FileDigestGroup.file-signature."boo#12345".digests."/etc/cron.daily/test-me-skipped"]
-algorithm = "skip"
-
-[FileDigestGroup.file-signature."boo#12345".digests."/var/out-of-cron"]
-algorithm = "skip"
-
 [FileMetadataCheck."boo#2345"]
 package = "foobar"
 note = "My note"
