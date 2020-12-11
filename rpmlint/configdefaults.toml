@@ -332,7 +332,7 @@ binaries = false
 
 [FileDigestLocation]
 
-[[FileDigestGroup]]
+[FileDigestGroup]
 
 [FileMetadataCheck]
 
