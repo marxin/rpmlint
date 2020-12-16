@@ -37,4 +37,4 @@ def test_signatures_bad(tmpdir, package, digestcheck):
     test.check(get_tested_package(package, tmpdir))
     out = output.print_results(output.results)
     assert len(output.results) == 1
-    assert 'file-signature-bad.x86_64: E: cron-file-digest-mismatch /etc/cron.daily/suse.de-sarg' in out
+    assert 'file-signature-bad.x86_64: E: cron-file-digest-mismatch /etc/cron.daily/suse.de-sarg expected:edeaaff3f1774ad2888673770c6d64097e391bc362d7d6fb34982ddf0efd18cb, has:8dbb513cddb18fe825dad6836161e03c109de7736913444dd5ad3de9d5579afe' in out

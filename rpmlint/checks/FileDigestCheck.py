@@ -73,12 +73,12 @@ class FileDigestCheck(AbstractCheck):
     def _is_valid_digest(self, pkgfile, digest, pkg):
         algorithm = digest['algorithm']
         if algorithm == 'skip':
-            return True
+            return (True, None)
 
         while stat.S_ISLNK(pkgfile.mode):
             pkgfile = pkg.readlink(pkgfile)
             if not pkgfile:
-                return False
+                return (False, None)
 
         digest_hash = digest['hash']
         pair = (pkgfile.name, algorithm)
@@ -92,7 +92,8 @@ class FileDigestCheck(AbstractCheck):
                     h.update(chunk)
             self.digest_cache[pair] = h.hexdigest()
 
-        return self.digest_cache[pair] == digest_hash
+        file_digest = self.digest_cache[pair]
+        return (file_digest == digest_hash, file_digest)
 
     def _calculate_errors_for_digest_group(self, pkg, digest_group, secured_paths):
         errors = []
@@ -102,20 +103,24 @@ class FileDigestCheck(AbstractCheck):
         # report errors for secured files not covered by the digest group
         for filename in secured_paths - covered_files:
             group = self._get_digest_configuration_group(pkg.files[filename])
-            errors.append((f'{group}-file-digest-unauthorized', filename))
+            errors.append((f'{group}-file-digest-unauthorized', filename, None))
 
         # report errors for missing files mentioned in the digest group
         for filename in covered_files - pkg_files:
             group = self._get_digest_configuration_group(pkg.files[filename])
-            errors.append((f'{group}-file-digest-unauthorized', filename))
+            errors.append((f'{group}-file-digest-unauthorized', filename, None))
 
         # report errors for invalid digests
         for digest in digest_group:
             filename = digest['path']
             if filename in pkg_files:
                 group = self._get_digest_configuration_group(pkg.files[filename])
-                if not self._is_valid_digest(pkg.files[filename], digest, pkg):
-                    errors.append((f'{group}-file-digest-mismatch', filename))
+                valid_digest, file_digest = self._is_valid_digest(pkg.files[filename], digest, pkg)
+                if not valid_digest:
+                    error_detail = None
+                    if file_digest:
+                        error_detail = f'expected:{digest["hash"]}, has:{file_digest}'
+                    errors.append((f'{group}-file-digest-mismatch', filename, error_detail))
 
         return errors
 
@@ -145,5 +150,5 @@ class FileDigestCheck(AbstractCheck):
                 best_errors = errors
 
         # Report errors
-        for message, filename in sorted(best_errors):
-            self.output.add_info('E', pkg, message, filename)
+        for message, filename, error_detail in sorted(best_errors):
+            self.output.add_info('E', pkg, message, filename, error_detail)
