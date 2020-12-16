@@ -15,9 +15,13 @@ class FileDigestCheck(AbstractCheck):
             self.follow_symlinks_in_group[group] = values['FollowSymlinks']
 
         self.digest_groups = []
+        self.digest_group_types = []
         for audit in self.config.configuration['FileDigestGroup'].values():
+            # verify that type of a FileDigestGroup is valid
+            assert audit['type'] in self.digest_configurations
             for _, v in audit['audits'].items():
                 self.digest_groups.append(v['digests'])
+                self.digest_group_types.append(audit['type'])
         for digest_group in self.digest_groups:
             # verify digest algorithm
             for digest in digest_group:
@@ -27,10 +31,12 @@ class FileDigestCheck(AbstractCheck):
                 else:
                     hashlib.new(algorithm)
         self.digest_cache = {}
-        self.digest_configuration_group_cache = {}
 
-    def _get_digest_configuration_group_no_cache(self, path):
-        path = Path(path)
+    def _get_digest_configuration_group(self, pkgfile):
+        if stat.S_ISDIR(pkgfile.mode):
+            return None
+
+        path = Path(pkgfile.name)
         for group, locations in self.digest_configurations.items():
             for location in locations:
                 try:
@@ -39,14 +45,6 @@ class FileDigestCheck(AbstractCheck):
                 except ValueError:
                     pass
         return None
-
-    def _get_digest_configuration_group(self, pkgfile):
-        if stat.S_ISDIR(pkgfile.mode):
-            return None
-        if pkgfile.name not in self.digest_configuration_group_cache:
-            gr = self._get_digest_configuration_group_no_cache(pkgfile.name)
-            self.digest_configuration_group_cache[pkgfile.name] = gr
-        return self.digest_configuration_group_cache[pkgfile.name]
 
     def _check_filetypes(self, pkg):
         """
@@ -95,32 +93,25 @@ class FileDigestCheck(AbstractCheck):
         file_digest = self.digest_cache[pair]
         return (file_digest == digest_hash, file_digest)
 
-    def _calculate_errors_for_digest_group(self, pkg, digest_group, secured_paths):
+    def _calculate_errors_for_digest_group(self, pkg, digest_group, group_type, secured_paths):
         errors = []
         covered_files = {dg['path'] for dg in digest_group}
         pkg_files = set(pkg.files.keys())
 
         # report errors for secured files not covered by the digest group
         for filename in secured_paths - covered_files:
-            group = self._get_digest_configuration_group(pkg.files[filename])
-            errors.append((f'{group}-file-digest-unauthorized', filename, None))
-
-        # report errors for missing files mentioned in the digest group
-        for filename in covered_files - pkg_files:
-            group = self._get_digest_configuration_group(pkg.files[filename])
-            errors.append((f'{group}-file-digest-unauthorized', filename, None))
+            errors.append((f'{group_type}-file-digest-unauthorized', filename, None))
 
         # report errors for invalid digests
         for digest in digest_group:
             filename = digest['path']
             if filename in pkg_files:
-                group = self._get_digest_configuration_group(pkg.files[filename])
                 valid_digest, file_digest = self._is_valid_digest(pkg.files[filename], digest, pkg)
                 if not valid_digest:
                     error_detail = None
                     if file_digest:
                         error_detail = f'expected:{digest["hash"]}, has:{file_digest}'
-                    errors.append((f'{group}-file-digest-mismatch', filename, error_detail))
+                    errors.append((f'{group_type}-file-digest-mismatch', filename, error_detail))
 
         return errors
 
@@ -142,8 +133,9 @@ class FileDigestCheck(AbstractCheck):
         # Iterate all digest groups and find one that covers all secured files
         # and in which all digests match
         best_errors = None
-        for digest_group in self.digest_groups:
-            errors = self._calculate_errors_for_digest_group(pkg, digest_group, secured_paths)
+        for i, digest_group in enumerate(self.digest_groups):
+            group_type = self.digest_group_types[i]
+            errors = self._calculate_errors_for_digest_group(pkg, digest_group, group_type, secured_paths)
             if not errors:
                 return
             if not best_errors or len(errors) < len(best_errors):
