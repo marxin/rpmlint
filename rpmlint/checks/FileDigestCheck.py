@@ -14,18 +14,11 @@ class FileDigestCheck(AbstractCheck):
             self.digest_configurations[group] = [Path(p) for p in values['Locations']]
             self.follow_symlinks_in_group[group] = values['FollowSymlinks']
 
-        self.digest_groups = []
-        self.digest_group_types = []
-        for values in self.config.configuration['FileDigestGroup'].values():
-            for audit_type, items in values.items():
-                # verify that type of a FileDigestGroup is valid
-                assert audit_type in self.digest_configurations
-                for _, v in items['audits'].items():
-                    self.digest_groups.append(v['digests'])
-                    self.digest_group_types.append(audit_type)
+        self.digest_groups = self.config.configuration['FileDigestGroup']
         for digest_group in self.digest_groups:
+            assert digest_group['type'] in self.digest_configurations
             # verify digest algorithm
-            for digest in digest_group:
+            for digest in digest_group['digests']:
                 algorithm = digest['algorithm']
                 if algorithm == 'skip':
                     pass
@@ -94,17 +87,18 @@ class FileDigestCheck(AbstractCheck):
         file_digest = self.digest_cache[pair]
         return (file_digest == digest_hash, file_digest)
 
-    def _calculate_errors_for_digest_group(self, pkg, digest_group, group_type, secured_paths):
+    def _calculate_errors_for_digest_group(self, pkg, digest_group, secured_paths):
         errors = []
-        covered_files = {dg['path'] for dg in digest_group}
+        covered_files = {dg['path'] for dg in digest_group['digests']}
         pkg_files = set(pkg.files.keys())
+        group_type = digest_group['type']
 
         # report errors for secured files not covered by the digest group
         for filename in secured_paths - covered_files:
             errors.append((f'{group_type}-file-digest-unauthorized', filename, None))
 
         # report errors for invalid digests
-        for digest in digest_group:
+        for digest in digest_group['digests']:
             filename = digest['path']
             if filename in pkg_files:
                 valid_digest, file_digest = self._is_valid_digest(pkg.files[filename], digest, pkg)
@@ -134,9 +128,8 @@ class FileDigestCheck(AbstractCheck):
         # Iterate all digest groups and find one that covers all secured files
         # and in which all digests match
         best_errors = None
-        for i, digest_group in enumerate(self.digest_groups):
-            group_type = self.digest_group_types[i]
-            errors = self._calculate_errors_for_digest_group(pkg, digest_group, group_type, secured_paths)
+        for digest_group in self.digest_groups:
+            errors = self._calculate_errors_for_digest_group(pkg, digest_group, secured_paths)
             if not errors:
                 return
             if not best_errors or len(errors) < len(best_errors):
