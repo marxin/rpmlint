@@ -16,12 +16,13 @@ class FileDigestCheck(AbstractCheck):
 
         self.digest_groups = []
         self.digest_group_types = []
-        for audit in self.config.configuration['FileDigestGroup'].values():
-            # verify that type of a FileDigestGroup is valid
-            assert audit['type'] in self.digest_configurations
-            for _, v in audit['audits'].items():
-                self.digest_groups.append(v['digests'])
-                self.digest_group_types.append(audit['type'])
+        for values in self.config.configuration['FileDigestGroup'].values():
+            for audit_type, items in values.items():
+                # verify that type of a FileDigestGroup is valid
+                assert audit_type in self.digest_configurations
+                for _, v in items['audits'].items():
+                    self.digest_groups.append(v['digests'])
+                    self.digest_group_types.append(audit_type)
         for digest_group in self.digest_groups:
             # verify digest algorithm
             for digest in digest_group:
