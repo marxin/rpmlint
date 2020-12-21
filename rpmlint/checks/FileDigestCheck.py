@@ -105,7 +105,7 @@ class FileDigestCheck(AbstractCheck):
                 if not valid_digest:
                     error_detail = None
                     if file_digest:
-                        error_detail = f'expected:{digest["hash"]}, has:{file_digest}'
+                        error_detail = f'expected {digest["algorithm"]}:{digest["hash"]}, has:{file_digest}'
                     errors.append((f'{group_type}-file-digest-mismatch', filename, error_detail))
 
         return errors
