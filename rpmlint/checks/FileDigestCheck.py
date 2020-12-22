@@ -91,11 +91,16 @@ class FileDigestCheck(AbstractCheck):
         errors = []
         covered_files = {dg['path'] for dg in digest_group['digests']}
         pkg_files = set(pkg.files.keys())
+        is_matching_group = pkg.name == digest_group['package']
         group_type = digest_group['type']
 
         # report errors for secured files not covered by the digest group
-        for filename in secured_paths - covered_files:
+        unauthorized = secured_paths - covered_files if is_matching_group else secured_paths
+        for filename in unauthorized:
             errors.append((f'{group_type}-file-digest-unauthorized', filename, None))
+
+        if not is_matching_group:
+            return errors
 
         # report errors for invalid digests
         for digest in digest_group['digests']:
