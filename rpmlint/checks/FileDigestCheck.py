@@ -115,6 +115,20 @@ class FileDigestCheck(AbstractCheck):
 
         return errors
 
+    def _check_group_type(self, pkg, group_type, secured_paths):
+        # Iterate all digest groups and find one that covers all secured files
+        # and in which all digests match
+        best_errors = None
+
+        for digest_group in self.digest_groups:
+            if digest_group['type'] == group_type:
+                errors = self._calculate_errors_for_digest_group(pkg, digest_group, secured_paths)
+                if not errors:
+                    return []
+                if not best_errors or len(errors) < len(best_errors):
+                    best_errors = errors
+        return best_errors
+
     def check_binary(self, pkg):
         """
         Check that all files in secured locations are covered by a file digest group
@@ -128,18 +142,17 @@ class FileDigestCheck(AbstractCheck):
             return
 
         # First collect all files that are in a digest configuration group
-        secured_paths = {pkgfile.name for pkgfile in pkg.files.values() if self._get_digest_configuration_group(pkgfile)}
+        secured_paths = {}
+        for pkgfile in pkg.files.values():
+            group_type = self._get_digest_configuration_group(pkgfile)
+            if group_type:
+                secured_paths.setdefault(group_type, [])
+                secured_paths[group_type].append(pkgfile.name)
 
-        # Iterate all digest groups and find one that covers all secured files
-        # and in which all digests match
-        best_errors = None
-        for digest_group in self.digest_groups:
-            errors = self._calculate_errors_for_digest_group(pkg, digest_group, secured_paths)
-            if not errors:
-                return
-            if not best_errors or len(errors) < len(best_errors):
-                best_errors = errors
+        errors = []
+        for group_type, files in secured_paths.items():
+            errors += self._check_group_type(pkg, group_type, set(files))
 
         # Report errors
-        for message, filename, error_detail in sorted(best_errors):
+        for message, filename, error_detail in sorted(errors):
             self.output.add_info('E', pkg, message, filename, error_detail)
