@@ -38,3 +38,8 @@ def test_signatures_bad(tmpdir, package, digestcheck):
     out = output.print_results(output.results)
     assert len(output.results) == 1
     assert 'file-signature-bad.x86_64: E: cron-file-digest-mismatch /etc/cron.daily/suse.de-sarg expected sha256:edeaaff3f1774ad2888673770c6d64097e391bc362d7d6fb34982ddf0efd18cb, has:8dbb513cddb18fe825dad6836161e03c109de7736913444dd5ad3de9d5579afe' in out
+
+
+def test_description_message(tmpdir, digestcheck):
+    output, test = digestcheck
+    assert output.get_description('cron-file-digest-unauthorized') == 'Please refer to\nhttps://en.opensuse.org/openSUSE:Package_security_guidelines#audit_bugs for\nmore information.\n\n'
