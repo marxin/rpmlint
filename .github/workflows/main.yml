@@ -42,7 +42,6 @@ jobs:
               python3-zstd
               python3-toml
               rpm-build
-              sqlite3
         if: ${{ startsWith(matrix.docker,  'opensuse') }}
       - run: zypper -n install python3-flake8-comprehensions
         if: ${{ matrix.docker == 'opensuse/tumbleweed' }}
@@ -77,13 +76,11 @@ jobs:
               python3-toml
               python3-zstd
               rpm-build
-              sqlite
         if: ${{ matrix.docker == 'fedora:33' }}
 
-      - run: pip install coveralls
       - uses: actions/checkout@v2
       - run: pytest
       - run: python3 -m cProfile -o profile.stats lint.py -V test/source/* test/binary/* > /dev/null
       - run: python3 test/dump_stats.py profile.stats
-      - run: echo "UPDATE file SET path = REPLACE(path, '/usr/src/rpmlint', '$(pwd)');" | sqlite3 .coverage
-      - run: coveralls
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
