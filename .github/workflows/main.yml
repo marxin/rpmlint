@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        docker: [opensuse/tumbleweed, opensuse/leap, fedora:33]
+        docker: [opensuse/tumbleweed, opensuse/leap, 'fedora:33']
 
     container: ${{ matrix.docker }}
 
