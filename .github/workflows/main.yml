@@ -43,7 +43,7 @@ jobs:
               python3-toml
               rpm-build
               sqlite3
-        if: ${{ startsWith(matrix.docker,  'opensuse' }}
+        if: ${{ startsWith(matrix.docker,  'opensuse') }}
       - run: zypper -n install python3-flake8-comprehensions
         if: ${{ matrix.docker == 'opensuse/tumbleweed' }}
       - run: pytest
