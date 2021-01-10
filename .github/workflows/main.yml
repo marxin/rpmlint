@@ -80,4 +80,5 @@ jobs:
               sqlite
         if: ${{ matrix.docker == 'fedora:33' }}
 
+      - uses: actions/checkout@v2
       - run: pytest
