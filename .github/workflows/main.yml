@@ -17,7 +17,7 @@ jobs:
     container: ${{ matrix.docker }}
 
     steps:
-      - run: |
+      - run:
               zypper -n install
               checkbashisms cpio dash gzip
               bzip2 xz
