@@ -17,8 +17,7 @@ jobs:
     container: ${{ matrix.docker }}
 
     steps:
-      - run:
-              zypper -n install
+      - run: zypper -n install
               checkbashisms cpio dash gzip
               bzip2 xz
               binutils glibc glibc-32bit glibc-locale desktop-file-utils
@@ -37,7 +36,6 @@ jobs:
               python3-flake8
               python3-flake8-builtins
               python3-flake8-bugbear
-              python3-flake8-comprehensions\
               python3-flake8-import-order
               python3-flake8-quotes
               python3-pyxdg
@@ -45,3 +43,5 @@ jobs:
               python3-toml
               rpm-build
               sqlite3
+      - run: zypper -n install python3-flake8-comprehensions
+        if: ${{ matrix.container == 'opensuse/tumbleweed' }}
