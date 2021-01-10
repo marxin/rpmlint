@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  setup_opensuse:
+  build_and_test:
     runs-on: ubuntu-latest
 
     strategy:
@@ -43,14 +43,7 @@ jobs:
               python3-toml
               rpm-build
               sqlite3
+        if: ${{ startsWith(matrix.docker,  'opensuse' }}
       - run: zypper -n install python3-flake8-comprehensions
         if: ${{ matrix.docker == 'opensuse/tumbleweed' }}
-
-  build:
-    needs: setup_opensuse
-    runs-on: ubuntu-latest
-    container: ${{ matrix.docker }}
-
-    steps:
-      - run: ls -l
-
+      - run: pytest
