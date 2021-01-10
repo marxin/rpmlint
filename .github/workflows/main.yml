@@ -44,4 +44,13 @@ jobs:
               rpm-build
               sqlite3
       - run: zypper -n install python3-flake8-comprehensions
-        if: ${{ matrix.container == 'opensuse/tumbleweed' }}
+        if: ${{ matrix.docker == 'opensuse/tumbleweed' }}
+
+  build:
+    needs: setup_opensuse
+    runs-on: ubuntu-latest
+    container: ${{ matrix.docker }}
+
+    steps:
+      - run: ls -l
+
