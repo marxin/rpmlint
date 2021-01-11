@@ -138,9 +138,6 @@ class FileDigestCheck(AbstractCheck):
         if not self._check_filetypes(pkg):
             return
 
-        if not self.digest_groups:
-            return
-
         # First collect all files that are in a digest configuration group
         secured_paths = {}
         for pkgfile in pkg.files.values():
@@ -151,7 +148,12 @@ class FileDigestCheck(AbstractCheck):
 
         errors = []
         for group_type, files in secured_paths.items():
-            errors += self._check_group_type(pkg, group_type, set(files))
+            group_errors = self._check_group_type(pkg, group_type, set(files))
+            if group_errors is not None:
+                errors += group_errors
+            else:
+                for f in files:
+                    errors.append((f'{group_type}-file-digest-unauthorized', f, None))
 
         # Report errors
         for message, filename, error_detail in sorted(errors):
